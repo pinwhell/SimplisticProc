@@ -1,0 +1,6 @@
+cmake_minimum_required(VERSION 3.16)
+project(simplistic-proc)
+find_package(simplistic-io REQUIRED)
+string(TOUPPER ${CMAKE_SYSTEM_NAME} CMAKE_SYSTEM_NAME_UPPER)
+add_definitions(-D${CMAKE_SYSTEM_NAME_UPPER})
+add_subdirectory(tests)
