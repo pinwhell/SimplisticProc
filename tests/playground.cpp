@@ -1,8 +1,11 @@
 #include <simplistic/io.h>
 #include <simplistic/proc/Platform.h>
 #include <iostream>
+#include <memory>
 #ifdef WINDOWS
 #include<Windows.h>
+#elif defined(LINUX)
+#include <unistd.h>
 #endif
 #include <functional>
 
