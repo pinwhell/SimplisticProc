@@ -18,3 +18,9 @@ string(TOUPPER ${CMAKE_SYSTEM_NAME} CMAKE_SYSTEM_NAME_UPPER)
 add_definitions(-D${CMAKE_SYSTEM_NAME_UPPER})
 add_subdirectory(src)
 add_subdirectory(tests)
+
+install(DIRECTORY ${CMAKE_SOURCE_DIR}/include/ DESTINATION include)
+install_cfgpkg(simplistic
+"
+find_dependency(simplistic-io)
+include(\${CMAKE_CURRENT_LIST_DIR}/simplistic-proc-targets.cmake)")

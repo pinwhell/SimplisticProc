@@ -28,7 +28,7 @@ int main()
 			example == s3 &&
 			obj.Derref(&pExample).mEntry == (std::uint64_t)pExample &&
 			obj.Derref(&pExample).Read<char>() == 'T' &&
-			*(std::uint32_t*)(obj.Derref(&pExample).ReadBlob(4).data()) == *(std::uint32_t*)example.data()
+			*(std::uint32_t*)(obj.Derref(&pExample).ReadBlob(sizeof(std::uint32_t)).data()) == *(std::uint32_t*)example.data()
 			);
 		return 0;
 	}
