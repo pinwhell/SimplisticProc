@@ -1,0 +1,6 @@
+find_package(simplistic-io REQUIRED)
+file(GLOB SPROC_SRCS *.cpp)
+add_library_ns(simplistic proc STATIC ${SPROC_SRCS})
+target_include_dir_iface(simplistic-proc PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../include include)
+target_compile_features(simplistic-proc PUBLIC cxx_std_17)
+target_link_libraries(simplistic-proc simplistic::io)
