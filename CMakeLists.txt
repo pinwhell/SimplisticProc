@@ -22,5 +22,6 @@ add_subdirectory(tests)
 install(DIRECTORY ${CMAKE_SOURCE_DIR}/include/ DESTINATION include)
 install_cfgpkg(simplistic
 "
+include(CMakeFindDependencyMacro)
 find_dependency(simplistic-io)
 include(\${CMAKE_CURRENT_LIST_DIR}/simplistic-proc-targets.cmake)")

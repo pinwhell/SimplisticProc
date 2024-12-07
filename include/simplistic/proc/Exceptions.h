@@ -9,6 +9,11 @@ namespace simplistic {
 			const char* what() const noexcept override;
 		};
 
+		class ProcessSnapshotCreationFailedException : public std::exception {
+		public:
+			const char* what() const noexcept override;
+		};
+
 		class ModuleSnapshotCreationFailedException : public std::exception {
 		public:
 			const char* what() const noexcept override;

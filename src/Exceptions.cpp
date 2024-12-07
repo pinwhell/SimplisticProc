@@ -6,6 +6,10 @@ const char* ProcessOpenFailedException::what() const noexcept {
 	return "Failed to open the process.";
 }
 
+const char* ProcessSnapshotCreationFailedException::what() const noexcept {
+	return "Failed to create process snapshot.";
+}
+
 const char* ModuleSnapshotCreationFailedException::what() const noexcept {
 	return "Failed to create module snapshot.";
 }
