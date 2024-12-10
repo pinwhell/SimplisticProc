@@ -1,6 +1,4 @@
 #include <simplistic/proc/Platform.h>
-#include <simplistic/proc/Self.h>
-#include <simplistic/proc/Exceptions.h>
 #include <Windows.h>
 #include <TlHelp32.h>
 #include <algorithm>
