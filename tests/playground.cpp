@@ -26,12 +26,12 @@ int main(int argc, const char** argv)
 		std::cout << info->mBase << std::endl;
 		simplistic::io::Object obj = self.Address(0);
 		auto y = obj.Read<int>(&x);
-		std::string s1 = obj.ReadString<char>(example.data());
-		std::string s2 = obj.DerrefString<char>(&pExample);
+		std::string s1 = obj.Address<simplistic::io::OString>().Read(example.data());
+		std::string s2 = obj.Address<simplistic::io::OString>().Read(&pExample);
 		auto s3 = obj
 			.Address(&pExample)
-			.Derref()
-			.ReadString<char>();
+			.Derref<simplistic::io::OString>()
+			.Read();
 		std::cout << std::boolalpha << (
 			example == s1 &&
 			example == s2 &&

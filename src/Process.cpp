@@ -39,10 +39,10 @@ std::size_t Process::ReadRaw(const std::uint8_t* where, std::uint8_t* out, std::
 
 #ifdef WINDOWS
 	if (ReadProcessMemory(mhProcess, where, out, len, &n) == FALSE && n == 0)
-		throw simplistic::io::IOException();
+		return n;
 #elif defined(LINUX)
 	if ((n = pread(mhProcess, out, len, (off_t)where)) < 0)
-		throw simplistic::io::IOException();
+		return 0;
 #endif
 	return n;
 }
@@ -52,10 +52,10 @@ std::size_t Process::WriteRaw(std::uint8_t* where, const std::uint8_t* in, std::
 	WIN_LNX(SIZE_T, ssize_t) n {};
 #ifdef WINDOWS
 	if (WriteProcessMemory(mhProcess, where, in, len, &n) == FALSE && n == 0)
-		throw simplistic::io::IOException();
+		return n;
 #elif defined(LINUX)
 	if ((n = pwrite(mhProcess, in, len, (off_t)where)) < 0)
-		throw simplistic::io::IOException();
+		return 0;
 #endif
 	return n;
 }
