@@ -1,10 +1,13 @@
 #include <simplistic/proc/Platform.h>
-#include <Windows.h>
-#include <TlHelp32.h>
 #include <algorithm>
 #include <iostream>
 #include <filesystem>
 #include <simplistic/proc/ProcOpenerFromName.h>
+
+#ifdef WINDOWS
+#include <Windows.h>
+#include <TlHelp32.h>
+#endif
 
 using namespace simplistic::proc;
 
@@ -21,13 +24,14 @@ int main(int argc, const char** argv)
 		auto& self = *procInfos[0];
 		auto info = self.GetModules()
 			->GetInfo(WIN_LNX("KERNEl32.DLL", "libc.so"), false);
+		std::cout << std::hex << "0x" << info->mBase << " 0x" << info->mSize << std::endl;
 		simplistic::io::Object k32Obj = *self.AddressModule(WIN_LNX("KERNEl32.DLL", "libc.so"), false);
-		std::cout << std::boolalpha << (k32Obj.Read<std::uint16_t>() == 0x5A4Du) /* PE/DOS Magic */ << '\n';
+		std::cout << std::boolalpha << (k32Obj.Read<std::uint16_t>() == WIN_LNX(0x5A4Du, 0x457Fu)) /* PE/DOS|ELF Magic */ << '\n';
 		std::cout << info->mBase << std::endl;
 		simplistic::io::Object obj = self.Address(0);
 		auto y = obj.Read<int>(&x);
 		std::string s1 = obj.Address<simplistic::io::OString>().Read(example.data());
-		std::string s2 = obj.Address<simplistic::io::OString>().Read(&pExample);
+		std::string s2 = obj.Address<simplistic::io::OString>().Derref(&pExample).Read();
 		auto s3 = obj
 			.Address(&pExample)
 			.Derref<simplistic::io::OString>()

@@ -3,7 +3,7 @@
 
 #ifdef WINDOWS
 #include<Windows.h>
-#elif defined(LINUX)
+#elif defined(LINUX) || defined(ANDROID)
 #include <unistd.h>
 #endif
 
@@ -14,7 +14,7 @@ void simplistic::proc::HandleClose(Handle handle)
 #ifdef WINDOWS
 	CloseHandle(handle);
 #elif defined(LINUX) || defined(ANDROID)
-	close(handle);
+	close((int)handle);
 #endif
 }
 
