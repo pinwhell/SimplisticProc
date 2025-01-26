@@ -8,7 +8,7 @@ namespace simplistic {
 		public:
 			ProcModules(std::uint64_t pid);
 			std::optional<ProcModuleInfo> GetInfo(std::string_view module, bool bStrict = true);
-
+			std::optional<std::vector<ProcModuleInfo>> GetAll() override;
 			std::uint64_t mPID;
 		};
 	}

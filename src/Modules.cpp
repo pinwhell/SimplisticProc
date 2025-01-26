@@ -34,26 +34,76 @@ int _stricmp(const char* a, const char* b) {
 
 #include <iostream>
 
+#ifdef WINDOWS
+// Generic module traverser
+void TraverseModules(DWORD processID, const std::function<void(const MODULEENTRY32&)>& callback) {
+    // Create a snapshot of the modules in the process
+    HANDLE hSnap = CreateToolhelp32Snapshot(TH32CS_SNAPMODULE | TH32CS_SNAPMODULE32, processID);
+    if (hSnap == INVALID_HANDLE_VALUE) {
+        throw ModuleSnapshotCreationFailedException();
+    }
+
+    HandleCloser hSnapCloser(hSnap); // Ensure proper resource cleanup
+
+    MODULEENTRY32 moduleEntry{};
+    moduleEntry.dwSize = sizeof(MODULEENTRY32);
+
+    // Iterate over the modules in the snapshot
+    if (Module32First(hSnap, &moduleEntry)) {
+        do {
+            callback(moduleEntry); // Report the module to the callback
+        } while (Module32Next(hSnap, &moduleEntry));
+    }
+}
+
+std::optional<std::vector<ProcModuleInfo>> GetAllModules(DWORD processID) {
+    std::vector<ProcModuleInfo> modules;
+
+    try {
+        TraverseModules(processID, [&](const MODULEENTRY32& moduleEntry) {
+            modules.push_back({
+                reinterpret_cast<std::uint64_t>(moduleEntry.modBaseAddr),
+                static_cast<std::size_t>(moduleEntry.modBaseSize),
+                std::string(moduleEntry.szModule)
+                });
+            });
+
+        if (modules.empty()) {
+            return std::nullopt; // Return nullopt if no modules are found
+        }
+
+        return modules; // Return the vector of modules
+    }
+    catch (...) {
+        return std::nullopt; // Return nullopt in case of any errors
+    }
+}
+
+// FindModuleInfo utility using the traverser
+std::optional<ProcModuleInfo> FindModuleInfo(DWORD processID, std::string_view moduleName, bool caseSensitive = true) {
+    // Function pointer for case-sensitive or case-insensitive comparison
+    auto strcmp_fn = caseSensitive ? strcmp : _stricmp;
+    std::optional<ProcModuleInfo> result;
+
+    // Use TraverseModules to look for the module
+    TraverseModules(processID, [&](const MODULEENTRY32& moduleEntry) {
+        if (strcmp_fn(moduleEntry.szModule, moduleName.data()) == 0) {
+            result = ProcModuleInfo{
+                reinterpret_cast<std::uint64_t>(moduleEntry.modBaseAddr),
+                static_cast<std::size_t>(moduleEntry.modBaseSize),
+                std::string(moduleEntry.szModule)
+            };
+        }
+        });
+
+    return result; // Return the found module or std::nullopt
+}
+#endif
+
 std::optional<ProcModuleInfo> ProcModules::GetInfo(std::string_view module, bool bStrict)
 {
-	auto _strcmp = bStrict ? strcmp : _stricmp;
 #ifdef WINDOWS
-	HANDLE hSnap = CreateToolhelp32Snapshot(TH32CS_SNAPMODULE32 | TH32CS_SNAPMODULE, mPID);
-	if (hSnap == INVALID_HANDLE_VALUE) throw ModuleSnapshotCreationFailedException();
-	HandleCloser hSnapCloser(hSnap);
-	MODULEENTRY32 curr{};
-	curr.dwSize = sizeof(MODULEENTRY32);
-	if (Module32First(hSnap, &curr))
-	{
-		do {
-			if (_strcmp(curr.szModule, module.data())) continue;
-			return ProcModuleInfo{ (std::uint64_t)curr.modBaseAddr, (std::size_t)curr.modBaseSize };
-		} while (Module32Next(hSnap, &curr));
-	}
-#ifndef SPROC_DISABLE_EXCEPTION
-	throw ModuleNotFoundException();
-#endif
-	return {};
+    return FindModuleInfo(mPID, module, bStrict);
 #else 
     // Open the /proc/[PID]/maps file to read memory mappings
     std::ifstream mapsFile("/proc/" + std::to_string(mPID) + "/maps");
@@ -119,5 +169,14 @@ std::optional<ProcModuleInfo> ProcModules::GetInfo(std::string_view module, bool
     }
 
     return ProcModuleInfo{ startAddr, moduleSize };
+#endif
+}
+
+std::optional<std::vector<ProcModuleInfo>> ProcModules::GetAll()
+{
+#ifdef WINDOWS
+    return GetAllModules(mPID);
+#else
+    return std::nullopt;
 #endif
 }
