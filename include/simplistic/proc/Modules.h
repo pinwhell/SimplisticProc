@@ -7,8 +7,7 @@ namespace simplistic {
 		class ProcModules : public IProcModules {
 		public:
 			ProcModules(std::uint64_t pid);
-			std::optional<ProcModuleInfo> GetInfo(std::string_view module, bool bStrict = true);
-			std::optional<std::vector<ProcModuleInfo>> GetAll() override;
+			void ForEach(std::function<bool(const ProcModuleInfo& mod)> cb);
 			std::uint64_t mPID;
 		};
 	}
