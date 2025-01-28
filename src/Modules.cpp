@@ -17,21 +17,6 @@ ProcModules::ProcModules(std::uint64_t pid)
 	: mPID(pid)
 {}
 
-#if defined(LINUX) || defined(ANDROID)
-int _stricmp(const char* a, const char* b) {
-	int ca, cb;
-	do {
-		ca = *(unsigned char*)a;
-		cb = *(unsigned char*)b;
-		ca = tolower(toupper(ca));
-		cb = tolower(toupper(cb));
-		a++;
-		b++;
-	} while (ca == cb && ca != '\0');
-	return ca - cb;
-}
-#endif
-
 #include <iostream>
 
 #ifdef WINDOWS
@@ -59,79 +44,104 @@ void TraverseModules(DWORD processID, std::function<bool(const ProcModuleInfo&)>
         } while (Module32Next(hSnap, &moduleEntry));
     }
 }
-#endif
+#elif defined(LINUX) || defined(ANDROID)
+struct VMAreaStruct {
+	std::uint64_t mStart;
+	std::uint64_t mEnd;
+	std::optional<std::string> mName;
+};
 
-//std::optional<ProcModuleInfo> ProcModules::GetInfo(std::string_view module, bool bStrict)
-//{
-//#ifdef WINDOWS
-//    return FindModuleInfo(mPID, module, bStrict);
-//#else 
-//    // Open the /proc/[PID]/maps file to read memory mappings
-//    std::ifstream mapsFile("/proc/" + std::to_string(mPID) + "/maps");
-//    if (!mapsFile.is_open()) {
-//        throw std::runtime_error("Failed to open /proc/[PID]/maps for PID: " + std::to_string(mPID));
-//    }
-//
-//    std::string line;
-//    bool foundModule = false;
-//    std::uint64_t startAddr = 0;
-//    std::uint64_t endAddr = 0;
-//    std::string currentModulePath;
-//    std::size_t moduleSize = 0;
-//
-//    while (std::getline(mapsFile, line)) {
-//        // Parse the address range and permissions
-//        std::istringstream lineStream(line);
-//        std::string addrRange, perms, path;
-//
-//        lineStream >> addrRange >> perms;  // We read address range and permissions
-//        if (addrRange.empty()) continue;    // Skip malformed lines
-//
-//        // Skip non-readable segments (we only care about readable memory segments)
-//        if (perms[0] != 'r') {
-//            continue;
-//        }
-//
-//        // Parse the address range (e.g., "04000000-04bcd000")
-//        size_t dashPos = addrRange.find('-');
-//        if (dashPos == std::string::npos) {
-//            continue; // Skip invalid lines without address range
-//        }
-//
-//        std::string startStr = addrRange.substr(0, dashPos);
-//        std::uint64_t segmentStart = std::stoull(startStr, nullptr, 16); // Convert start address to uint64_t
-//
-//        std::string endStr = addrRange.substr(dashPos + 1);
-//        std::uint64_t segmentEnd = std::stoull(endStr, nullptr, 16); // Convert end address to uint64_t
-//        // Parse the module path (last part of the line)
-//        while (lineStream >> path);  // The last element should be the file path
-//
-//        // Check if the path contains the module name
-//        if (strstr(path.c_str(), module.data())) {
-//            if (!foundModule) {
-//                // If we find the first occurrence, set the base address and size
-//                foundModule = true;
-//                startAddr = segmentStart;
-//                currentModulePath = path;
-//                endAddr = segmentEnd;
-//                moduleSize = endAddr - startAddr;
-//            }
-//            else if (path == currentModulePath) {
-//                // If it's the same module and segment, accumulate the size
-//                moduleSize += segmentEnd - endAddr;
-//                endAddr = segmentEnd; // Update the end address
-//            }
-//        }
-//        else if (foundModule) break;
-//    }
-//
-//    if (!foundModule) {
-//        return {}; // Return empty if module is not found
-//    }
-//
-//    return ProcModuleInfo{ startAddr, moduleSize };
-//#endif
-//}
+void TraverseVmAreas(std::uint64_t pid, std::function<bool(const VMAreaStruct&)> cb) {
+	std::ifstream mapsFile("/proc/" + std::to_string(pid) + "/maps");
+	std::string line;
+	while (std::getline(mapsFile, line)) {
+		auto dashPos = line.find('-');
+		auto spacePos = line.find(' ', dashPos);
+		if (!cb({
+			std::stoull(line.substr(0, dashPos), nullptr, 16),
+			std::stoull(line.substr(dashPos + 1, spacePos - dashPos - 1), nullptr, 16),
+			(spacePos = line.find_last_of(' ')) != std::string::npos && spacePos < line.size() - 1
+				? std::optional<std::string>(line.substr(spacePos + 1))
+				: std::nullopt
+			})) break;
+	}
+}
+
+void TraverseModulesRaw(std::uint64_t pid, std::function<bool(const simplistic::proc::ProcModuleInfo&)> cb)
+{
+	simplistic::proc::ProcModuleInfo currModule{};
+	std::size_t segGaps = 0u;
+
+	TraverseVmAreas(pid, [&](const VMAreaStruct& seg) {
+		if (!seg.mName)
+		{
+			// At this point current segment has no name
+
+			if (segGaps++ < 3 == false) return true;
+			// At this point seg is a gap
+			// lets update module
+			currModule.mSize = seg.mEnd - seg.mStart;
+			return true;
+		}
+
+		// At this point... segment has name
+
+		if (!currModule.mName)
+		{
+			// At this point... the currModule start 
+			// being in a valid state... so lets 
+			// make seg the initial
+
+			currModule.mName = *seg.mName;
+			currModule.mBase = seg.mStart;
+			currModule.mSize = seg.mEnd - seg.mStart;
+
+			return true;
+		}
+
+		if (currModule.mName == *seg.mName)
+		{
+			// At this point... the name is 
+			// same as the current segment
+			// lets just extend the currModule
+			// And move on
+			segGaps = 0u;
+			currModule.mSize = seg.mEnd - seg.mStart;
+			return true;
+		}
+
+		// At this point... its time to report 
+		// this End of module and setup
+		// the beinning of this new one
+
+		if (!cb(currModule)) return false;
+		// At this point.. the user want more!!
+
+		currModule.mBase = seg.mStart;
+		currModule.mSize = seg.mEnd - seg.mStart;
+		currModule.mName = *seg.mName;
+
+		return true;
+		});
+}
+
+void TraverseModules(std::uint64_t pid, std::function<bool(const simplistic::proc::ProcModuleInfo& mod)> cb)
+{
+	std::vector<simplistic::proc::ProcModuleInfo> all;
+	TraverseModulesRaw(pid, [&](const simplistic::proc::ProcModuleInfo& mod) {
+		all.push_back(mod);
+		return true;
+		});
+	std::unordered_map<std::string, simplistic::proc::ProcModuleInfo> deduplicated;
+	for (const auto& moduleInfo : all) {
+		auto& entry = deduplicated[*moduleInfo.mName];
+		if (entry.mSize >= moduleInfo.mSize)  continue;
+		entry = moduleInfo;
+	}
+	for (const auto& [_, mod] : deduplicated)
+		if (!cb(mod)) continue;
+}
+#endif
 
 void ProcModules::ForEach(std::function<bool(const ProcModuleInfo& mod)> cb)
 {

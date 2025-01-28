@@ -27,9 +27,9 @@ int main(int argc, const char** argv)
 			for (const auto& module : *modulesInfos)
 				std::cout << *module.mName << " 0x" << std::hex << module.mBase << std::endl;
 		auto info = modules
-			.GetInfo(WIN_LNX("KERNEl32.DLL", "libc.so"), false);
+			.GetInfo(WIN_LNX("KERNEl32.DLL", "/system/lib/libc.so"), false);
 		std::cout << *(info->mName) << std::hex << " 0x" << info->mBase << " 0x" << info->mSize << std::endl;
-		simplistic::io::Object k32Obj = *self.AddressModule(WIN_LNX("KERNEl32.DLL", "libc.so"), false);
+		simplistic::io::Object k32Obj = *self.AddressModule(WIN_LNX("KERNEl32.DLL", "/system/lib/libc.so"), false);
 		std::cout << std::boolalpha << (k32Obj.Read<std::uint16_t>() == WIN_LNX(0x5A4Du, 0x457Fu)) /* PE/DOS|ELF Magic */ << '\n';
 		std::cout << info->mBase << std::endl;
 		simplistic::io::Object obj = self.Address(0);
